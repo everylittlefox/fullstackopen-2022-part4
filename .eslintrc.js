@@ -6,11 +6,11 @@ module.exports = {
     jest: true
   },
   extends: 'standard',
-  overrides: [
-  ],
+  overrides: [],
   parserOptions: {
     ecmaVersion: 'latest'
   },
   rules: {
+    'space-before-function-paren': ['error', 'never']
   }
 }

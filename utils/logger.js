@@ -1,8 +1,8 @@
 module.exports = {
-  info (...params) {
+  info(...params) {
     console.log(...params)
   },
-  error (...params) {
+  error(...params) {
     console.error(...params)
   }
 }
