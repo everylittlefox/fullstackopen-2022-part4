@@ -110,6 +110,33 @@ describe('addition of a new note', () => {
   })
 })
 
+test('update a blog', async () => {
+  const blog = (await Blog.findOne({})).toJSON()
+
+  await api
+    .put(`/api/blogs/${blog.id}`)
+    .send({ ...blog, author: 'updated author' })
+    .expect(200)
+    .expect('Content-Type', /application\/json/)
+
+  const updatedBlogsList = await Blog.find({})
+  const authors = updatedBlogsList.map((ub) => ub.author)
+
+  expect(authors).toContain('updated author')
+})
+
+test('delete a blog', async () => {
+  const blog = (await Blog.findOne({})).toJSON()
+
+  await api.delete(`/api/blogs/${blog.id}`).expect(204)
+
+  const newBlogsList = await Blog.find({})
+  expect(newBlogsList).toHaveLength(blogs.length - 1)
+
+  const titles = newBlogsList.map((nb) => nb.title)
+  expect(titles).not.toContain(blog.title)
+})
+
 afterAll(() => {
   mongoose.connection.close()
 })
