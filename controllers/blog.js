@@ -9,17 +9,8 @@ blogRouter.get('/', async (request, response) => {
   return response.json(blogs)
 })
 
-const getTokenFrom = request => {
-  const authorization = request.get('authorization')
-  if (authorization && authorization.toLowerCase().startsWith('bearer ')) {
-    return authorization.substring(7)
-  }
-  return null
-}
-
 blogRouter.post('/', async (request, response) => {
-  const token = getTokenFrom(request)
-  const decodedToken = jwt.verify(token, JWT_SECRET)
+  const decodedToken = jwt.verify(request.token, JWT_SECRET)
 
   if (!decodedToken.id) {
     return response.status(401).json({ error: 'token missing or invalid' })

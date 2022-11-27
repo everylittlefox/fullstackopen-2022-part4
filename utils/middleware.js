@@ -8,6 +8,19 @@ const logging = (req, res, next) => {
   next()
 }
 
+const tokenExtractor = (req, res, next) => {
+  req.token = getTokenFrom(req)
+  next()
+}
+
+const getTokenFrom = request => {
+  const authorization = request.get('authorization')
+  if (authorization && authorization.toLowerCase().startsWith('bearer ')) {
+    return authorization.substring(7)
+  }
+  return null
+}
+
 const unknownEndpoint = (req, res) =>
   res.status(404).json({ error: 'resource not found.' })
 
@@ -30,4 +43,4 @@ const errorHandler = (error, req, res, next) => {
   }
 }
 
-module.exports = { unknownEndpoint, errorHandler, logging }
+module.exports = { tokenExtractor, unknownEndpoint, errorHandler, logging }
