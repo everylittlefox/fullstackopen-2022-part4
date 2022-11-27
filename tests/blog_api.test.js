@@ -67,7 +67,7 @@ describe('when there is initially some blogs in db', () => {
   })
 })
 
-describe('addition of a new note', () => {
+describe('addition of a new blog', () => {
   test('succeeds with valid data', async () => {
     const newBlog = {
       title: 'new title',
@@ -107,6 +107,20 @@ describe('addition of a new note', () => {
     await api.post('/api/blogs').send({ title: 'new title' }).expect(400)
     await api.post('/api/blogs').send({ url: 'new url' }).expect(400)
     await api.post('/api/blogs').send({}).expect(400)
+  })
+
+  test('user field of blog is populated', async () => {
+    const newBlog = {
+      title: 'new title',
+      author: 'new author',
+      url: 'new url'
+    }
+
+    const response = await api.post('/api/blogs').send(newBlog)
+
+    const createdBlog = response.body
+
+    expect(createdBlog.user).toBeDefined()
   })
 })
 

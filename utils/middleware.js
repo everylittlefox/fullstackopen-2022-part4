@@ -15,6 +15,9 @@ const errorHandler = (error, req, res, next) => {
   logger.error(error.message)
 
   switch (error.name) {
+    case 'MissingPasswordError':
+    case 'UserAlreadyExistsError':
+    case 'InvalidPasswordError':
     case 'ValidationError':
       return res.status(400).json({ error: error.message })
 
