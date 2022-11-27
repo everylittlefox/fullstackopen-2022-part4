@@ -15,6 +15,10 @@ const errorHandler = (error, req, res, next) => {
   logger.error(error.message)
 
   switch (error.name) {
+    case 'JsonWebTokenError':
+      return res.status(401).json({ error: 'invalid token' })
+    case 'InvalidUsernameOrPasswordError':
+      return res.status(401).json({ error: error.message })
     case 'MissingPasswordError':
     case 'UserAlreadyExistsError':
     case 'InvalidPasswordError':

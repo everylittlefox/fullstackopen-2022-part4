@@ -5,6 +5,13 @@ class InvalidPasswordError extends Error {
   }
 }
 
+class InvalidUsernameOrPasswordError extends Error {
+  constructor() {
+    super('invalid username or password')
+    this.name = 'InvalidUsernameOrPasswordError'
+  }
+}
+
 class MissingPasswordError extends Error {
   constructor() {
     super('password field is required')
@@ -22,5 +29,6 @@ class UserAlreadyExistsError extends Error {
 module.exports = {
   InvalidPasswordError,
   MissingPasswordError,
-  UserAlreadyExistsError
+  UserAlreadyExistsError,
+  InvalidUsernameOrPasswordError
 }
