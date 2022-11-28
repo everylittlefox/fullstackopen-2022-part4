@@ -2,6 +2,10 @@ const mongoose = require('mongoose')
 const supertest = require('supertest')
 const app = require('../app')
 const Blog = require('../models/blog')
+const User = require('../models/user')
+const { JWT_SECRET } = require('../utils/config')
+const jwt = require('jsonwebtoken')
+const bcrypt = require('bcrypt')
 
 const api = supertest(app)
 
@@ -46,13 +50,13 @@ const blogs = [
 
 jest.setTimeout(30000)
 
-beforeEach(async () => {
-  await Blog.deleteMany({})
-  const saveBlogsPromises = blogs.map((b) => new Blog(b).save())
-  await Promise.all(saveBlogsPromises)
-})
-
 describe('when there is initially some blogs in db', () => {
+  beforeEach(async () => {
+    await Blog.deleteMany({})
+    const saveBlogsPromises = blogs.map((b) => new Blog(b).save())
+    await Promise.all(saveBlogsPromises)
+  })
+
   test('all blogs are returned', async () => {
     const res = await api.get('/api/blogs')
 
@@ -68,6 +72,13 @@ describe('when there is initially some blogs in db', () => {
 })
 
 describe('addition of a new blog', () => {
+  let token = null
+
+  beforeEach(async () => {
+    await Blog.deleteMany({})
+    token = (await generateNewUserToken())[0]
+  })
+
   test('succeeds with valid data', async () => {
     const newBlog = {
       title: 'new title',
@@ -78,12 +89,13 @@ describe('addition of a new blog', () => {
 
     await api
       .post('/api/blogs')
+      .set('Authorization', `bearer ${token}`)
       .send(newBlog)
       .expect(201)
       .expect('Content-Type', /application\/json/)
 
     const newBlogsList = await Blog.find({})
-    expect(newBlogsList).toHaveLength(blogs.length + 1)
+    expect(newBlogsList).toHaveLength(1)
 
     const titles = newBlogsList.map((b) => b.title)
     expect(titles).toContain('new title')
@@ -96,7 +108,10 @@ describe('addition of a new blog', () => {
       url: 'new url'
     }
 
-    const response = await api.post('/api/blogs').send(newBlog)
+    const response = await api
+      .post('/api/blogs')
+      .set('Authorization', `bearer ${token}`)
+      .send(newBlog)
 
     const createdBlog = response.body
 
@@ -104,9 +119,21 @@ describe('addition of a new blog', () => {
   })
 
   test('fails with statuscode 400 if "title" or "url" is missing', async () => {
-    await api.post('/api/blogs').send({ title: 'new title' }).expect(400)
-    await api.post('/api/blogs').send({ url: 'new url' }).expect(400)
-    await api.post('/api/blogs').send({}).expect(400)
+    await api
+      .post('/api/blogs')
+      .set('Authorization', `bearer ${token}`)
+      .send({ title: 'new title' })
+      .expect(400)
+    await api
+      .post('/api/blogs')
+      .set('Authorization', `bearer ${token}`)
+      .send({ url: 'new url' })
+      .expect(400)
+    await api
+      .post('/api/blogs')
+      .set('Authorization', `bearer ${token}`)
+      .send({})
+      .expect(400)
   })
 
   test('user field of blog is populated', async () => {
@@ -116,7 +143,10 @@ describe('addition of a new blog', () => {
       url: 'new url'
     }
 
-    const response = await api.post('/api/blogs').send(newBlog)
+    const response = await api
+      .post('/api/blogs')
+      .set('Authorization', `bearer ${token}`)
+      .send(newBlog)
 
     const createdBlog = response.body
 
@@ -124,33 +154,122 @@ describe('addition of a new blog', () => {
   })
 })
 
-test('update a blog', async () => {
-  const blog = (await Blog.findOne({})).toJSON()
+describe('update a blog', () => {
+  let token = null
+  let blog = null
 
-  await api
-    .put(`/api/blogs/${blog.id}`)
-    .send({ ...blog, author: 'updated author' })
-    .expect(200)
-    .expect('Content-Type', /application\/json/)
+  beforeEach(async () => {
+    await Blog.deleteMany({})
+    const [t, user] = await generateNewUserToken()
+    const { id } = jwt.verify(t, JWT_SECRET)
 
-  const updatedBlogsList = await Blog.find({})
-  const authors = updatedBlogsList.map((ub) => ub.author)
+    const blogToUpdate = new Blog({
+      title: 'new title',
+      author: 'new author',
+      url: 'new url',
+      user: id
+    })
 
-  expect(authors).toContain('updated author')
+    user.blogs = user.blogs.concat(blogToUpdate._id)
+    await user.save()
+
+    await blogToUpdate.save()
+
+    blog = blogToUpdate.toJSON()
+    token = t
+  })
+
+  test('update when user token provided', async () => {
+    await api
+      .put(`/api/blogs/${blog.id}`)
+      .set('Authorization', `bearer ${token}`)
+      .send({ ...blog, author: 'updated author' })
+      .expect(200)
+      .expect('Content-Type', /application\/json/)
+
+    const updatedBlogsList = await Blog.find({})
+    const authors = updatedBlogsList.map((ub) => ub.author)
+
+    expect(authors).toContain('updated author')
+  })
+
+  test('fails with 401 when user token not provided', async () => {
+    await api
+      .put(`/api/blogs/${blog.id}`)
+      .send({ ...blog, author: 'updated author' })
+      .expect(401)
+
+    const updatedBlogsList = await Blog.find({})
+    const authors = updatedBlogsList.map((ub) => ub.author)
+
+    expect(authors).not.toContain('updated author')
+  })
 })
 
-test('delete a blog', async () => {
-  const blog = (await Blog.findOne({})).toJSON()
+describe('delete a blog', () => {
+  let token = null
+  let blog = null
 
-  await api.delete(`/api/blogs/${blog.id}`).expect(204)
+  beforeEach(async () => {
+    await Blog.deleteMany({})
+    const [t, user] = await generateNewUserToken()
+    const { id } = jwt.verify(t, JWT_SECRET)
 
-  const newBlogsList = await Blog.find({})
-  expect(newBlogsList).toHaveLength(blogs.length - 1)
+    const blogToDelete = new Blog({
+      title: 'new title',
+      author: 'new author',
+      url: 'new url',
+      user: id
+    })
 
-  const titles = newBlogsList.map((nb) => nb.title)
-  expect(titles).not.toContain(blog.title)
+    user.blogs = user.blogs.concat(blogToDelete._id)
+    await user.save()
+
+    await blogToDelete.save()
+
+    blog = { id: blogToDelete._id.toString(), title: blogToDelete.title }
+    token = t
+  })
+
+  test('delete when user token provided', async () => {
+    await api
+      .delete(`/api/blogs/${blog.id}`)
+      .set('Authorization', `bearer ${token}`)
+      .expect(204)
+
+    const newBlogsList = await Blog.find({})
+    expect(newBlogsList).toHaveLength(0)
+
+    const titles = newBlogsList.map((nb) => nb.title)
+    expect(titles).not.toContain(blog.title)
+  })
+
+  test('fails with 401 when user token not provided', async () => {
+    const blog = (await Blog.findOne({})).toJSON()
+
+    await api.delete(`/api/blogs/${blog.id}`).expect(401)
+
+    const newBlogsList = await Blog.find({})
+    expect(newBlogsList).toHaveLength(1)
+
+    const titles = newBlogsList.map((nb) => nb.title)
+    expect(titles).toContain(blog.title)
+  })
 })
 
 afterAll(() => {
   mongoose.connection.close()
 })
+
+const generateNewUserToken = async () => {
+  await User.deleteMany({})
+  const user = new User({
+    username: 'root',
+    passwordHash: await bcrypt.hash('root', 10)
+  })
+  await user.save()
+  return [
+    jwt.sign({ username: user.username, id: user._id.toString() }, JWT_SECRET),
+    user
+  ]
+}

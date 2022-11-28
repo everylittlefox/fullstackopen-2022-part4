@@ -24,6 +24,24 @@ const userExtractor = async (req, res, next) => {
   next()
 }
 
+const blogUserAuthenticator = (req, res, next) => {
+  const user = req.user
+
+  if (!user) {
+    return res.status(401).json({ error: 'token missing or invalid' })
+  }
+
+  const blogInUser = user.blogs.find((b) => b.toString() === req.params.id)
+
+  if (!blogInUser) {
+    return res
+      .status(401)
+      .json({ error: 'you are not authorized to perform this action' })
+  }
+
+  next()
+}
+
 const getTokenFrom = (request) => {
   const authorization = request.get('authorization')
   if (authorization && authorization.toLowerCase().startsWith('bearer ')) {
@@ -54,4 +72,11 @@ const errorHandler = (error, req, res, next) => {
   }
 }
 
-module.exports = { tokenExtractor, userExtractor, unknownEndpoint, errorHandler, logging }
+module.exports = {
+  tokenExtractor,
+  userExtractor,
+  blogUserAuthenticator,
+  unknownEndpoint,
+  errorHandler,
+  logging
+}
