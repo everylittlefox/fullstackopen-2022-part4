@@ -40,7 +40,7 @@ blogRouter.put(
         context: 'query',
         new: true
       }
-    )
+    ).populate('user', { username: 1, name: 1 })
     response.status(200).json(updatedBlog)
   }
 )
